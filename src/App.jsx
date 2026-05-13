@@ -72,6 +72,9 @@ const t = {
     total: 'الإجمالي',
     exportPDF: 'تصدير PDF',
     exportImage: 'تصدير صورة',
+    username: 'اسم المستخدم',
+    password: 'كلمة المرور',
+    login: 'تسجيل الدخول',
   },
   en: {
     storeName: 'Freeze Dry',
@@ -140,13 +143,46 @@ const t = {
     total: 'Total',
     exportPDF: 'Export PDF',
     exportImage: 'Export Image',
+    username: 'Username',
+    password: 'Password',
+    login: 'Login',
   }
 };
 
-const getName = (p, lang) => p.name[lang] || p.name;
-const getCat = (p, lang) => p.category[lang] || p.category;
-const getPrice = (p, lang) => p.price[lang] || p.price;
-const getDesc = (p, lang) => p.description[lang] || p.description;
+const getName = (p, lang) => (p.name?.[lang] || p.name || "").toString();
+const getCat = (p, lang) => (p.category?.[lang] || p.category || "").toString();
+const getPrice = (p, lang) => (p.price?.[lang] || p.price || "").toString();
+const getDesc = (p, lang) => (p.description?.[lang] || p.description || "").toString();
+
+const compressImage = (base64Str, maxWidth = 800, maxHeight = 800, quality = 0.6) => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.src = base64Str;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > maxWidth) {
+          height *= maxWidth / width;
+          width = maxWidth;
+        }
+      } else {
+        if (height > maxHeight) {
+          width *= maxHeight / height;
+          height = maxHeight;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+  });
+};
 
 const exportElement = async (elementId, filename, format = 'pdf') => {
   const element = document.getElementById(elementId);
@@ -328,8 +364,8 @@ const CatalogView = ({ lang, texts, searchQuery, setSearchQuery, appCategories, 
         </button>
       </div>
 
-      {/* VISUAL CATEGORY NAVIGATOR */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-16">
+      {/* CATEGORY NAVIGATOR (TEXT ONLY) */}
+      <div className="flex flex-wrap justify-center gap-3 mb-12">
         {appCategories[lang].map(cat => {
           const catName = cat.name[lang] || cat.name;
           const isActive = searchQuery === catName || (cat.id === 'all' && (searchQuery === '' || searchQuery === 'All' || searchQuery === 'الكل'));
@@ -337,19 +373,12 @@ const CatalogView = ({ lang, texts, searchQuery, setSearchQuery, appCategories, 
             <button
               key={cat.id}
               onClick={() => setSearchQuery(cat.id === 'all' ? '' : catName)}
-              className={`relative h-24 md:h-32 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-500 group ${isActive ? 'ring-4 ring-gold ring-offset-4 scale-105 z-10' : 'opacity-80 hover:opacity-100'}`}
+              className={`px-6 py-2.5 rounded-full font-cairo font-bold text-sm transition-all duration-300 border ${isActive
+                ? 'bg-navy text-white border-navy shadow-lg scale-105'
+                : 'bg-white text-gray-500 border-gray-100 hover:border-navy hover:text-navy'
+                }`}
             >
-              <img 
-                src={cat.image} 
-                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
-                alt={catName}
-              />
-              <div className={`absolute inset-0 flex items-center justify-center transition-all duration-500 ${isActive ? 'bg-navy/40' : 'bg-black/40 group-hover:bg-black/20'}`}>
-                <span className="text-white font-cairo font-bold text-xs md:text-base uppercase tracking-widest drop-shadow-lg">{catName}</span>
-              </div>
-              {isActive && (
-                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-8 h-1 bg-gold rounded-full"></div>
-              )}
+              {catName}
             </button>
           );
         })}
@@ -658,13 +687,20 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
     const file = e.target.files[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        if (type === 'product') setProductImage(reader.result);
-        else if (type === 'category') setCategoryImage(reader.result);
+      reader.onloadend = async () => {
+        let imageData = reader.result;
+        
+        // Only compress images, not videos
+        if (file.type.startsWith('image/')) {
+          imageData = await compressImage(reader.result);
+        }
+
+        if (type === 'product') setProductImage(imageData);
+        else if (type === 'category') setCategoryImage(imageData);
         else if (type === 'banner') {
           setBannerData(prev => ({
             ...prev,
-            mediaUrl: reader.result,
+            mediaUrl: imageData,
             mediaType: file.type.startsWith('video') ? 'video' : 'image'
           }));
         }
@@ -1000,6 +1036,24 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
                 <div className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-sm transition-all ${showPricesPublicly ? (lang === 'ar' ? '-translate-x-7' : 'translate-x-7') : (lang === 'ar' ? '-translate-x-1' : 'translate-x-1')}`}></div>
               </button>
             </div>
+
+            <div className="py-6 border-b border-gray-50">
+              <button
+                onClick={() => {
+                  if (confirm(lang === 'ar' ? 'هل أنت متأكد من حذف جميع البيانات؟ سيتم استعادة البيانات الأصلية.' : 'Are you sure you want to clear all data? This will restore original data.')) {
+                    localStorage.removeItem('products');
+                    localStorage.removeItem('categories');
+                    localStorage.removeItem('bannerData');
+                    localStorage.removeItem('orders');
+                    window.location.reload();
+                  }
+                }}
+                className="w-full py-3 bg-red-50 text-red-600 font-bold font-cairo rounded-xl hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
+              >
+                <Trash2 size={18} />
+                {lang === 'ar' ? 'مسح كافة البيانات وإعادة التعيين' : 'Clear All Data & Reset'}
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -1242,15 +1296,31 @@ export default function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem('products', JSON.stringify(products));
+    try {
+      localStorage.setItem('products', JSON.stringify(products));
+    } catch (e) {
+      if (e.name === 'QuotaExceededError') {
+        alert(lang === 'ar' ? 'عذراً، مساحة التخزين ممتلئة. يرجى حذف بعض المنتجات أو الصور القديمة.' : 'Storage quota exceeded. Please delete some old products or images.');
+      }
+    }
   }, [products]);
 
   useEffect(() => {
-    localStorage.setItem('categories', JSON.stringify(appCategories));
+    try {
+      localStorage.setItem('categories', JSON.stringify(appCategories));
+    } catch (e) {
+      if (e.name === 'QuotaExceededError') {
+        alert(lang === 'ar' ? 'عذراً، مساحة التخزين ممتلئة. يرجى حذف بعض الفئات أو الصور القديمة.' : 'Storage quota exceeded. Please delete some old categories or images.');
+      }
+    }
   }, [appCategories]);
 
   useEffect(() => {
-    localStorage.setItem('bannerData', JSON.stringify(bannerData));
+    try {
+      localStorage.setItem('bannerData', JSON.stringify(bannerData));
+    } catch (e) {
+      console.error("Banner storage error:", e);
+    }
   }, [bannerData]);
 
   useEffect(() => {
@@ -1534,10 +1604,10 @@ export default function App() {
                 setAuthError(lang === 'ar' ? 'بيانات غير صحيحة' : 'Invalid credentials');
               }
             }} className="space-y-6">
-              <input required name="username" type="text" placeholder="Username" className="w-full p-4 border-b border-gray-300 outline-none font-cairo" dir="ltr" />
-              <input required name="password" type="password" placeholder="Password" className="w-full p-4 border-b border-gray-300 outline-none font-cairo" dir="ltr" />
+              <input required name="username" type="text" placeholder={texts.username} className={`w-full p-4 border-b border-gray-300 outline-none font-cairo ${lang === 'ar' ? 'text-right' : 'text-left'}`} dir={lang === 'ar' ? 'rtl' : 'ltr'} />
+              <input required name="password" type="password" placeholder={texts.password} className={`w-full p-4 border-b border-gray-300 outline-none font-cairo ${lang === 'ar' ? 'text-right' : 'text-left'}`} dir={lang === 'ar' ? 'rtl' : 'ltr'} />
               {authError && <p className="text-red-500 text-sm font-cairo text-center">{authError}</p>}
-              <button type="submit" className="w-full py-4 bg-navy text-white font-cairo font-bold rounded-xl hover:bg-navy/90 transition-colors">Login</button>
+              <button type="submit" className="w-full py-4 bg-navy text-white font-cairo font-bold rounded-xl hover:bg-navy/90 transition-colors">{texts.login}</button>
             </form>
           </div>
         </div>
