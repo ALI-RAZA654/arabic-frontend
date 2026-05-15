@@ -154,6 +154,12 @@ const getCat = (p, lang) => (p.category?.[lang] || p.category || "").toString();
 const getPrice = (p, lang) => (p.price?.[lang] || p.price || "").toString();
 const getDesc = (p, lang) => (p.description?.[lang] || p.description || "").toString();
 
+const parsePrice = (priceStr) => {
+  if (!priceStr) return 0;
+  const num = parseFloat(priceStr.toString().replace(/[^0-9.]/g, ''));
+  return isNaN(num) ? 0 : num;
+};
+
 const compressImage = (base64Str, maxWidth = 800, maxHeight = 800, quality = 0.6) => {
   return new Promise((resolve) => {
     const img = new Image();
@@ -186,23 +192,29 @@ const compressImage = (base64Str, maxWidth = 800, maxHeight = 800, quality = 0.6
 
 const exportElement = async (elementId, filename, format = 'pdf') => {
   const element = document.getElementById(elementId);
-  if (!element) return;
+  if (!element) {
+    alert("Export element not found");
+    return;
+  }
 
-  // Temporarily show the element if it's hidden for export
-  const originalStyle = element.style.display;
-  element.style.display = 'block';
-  element.style.position = 'fixed';
-  element.style.left = '-9999px';
-  element.style.top = '0';
-  element.style.width = '1200px';
+  // Make visible for capture (it's already positioned off-screen)
+  const originalVisibility = element.style.visibility;
+  element.style.visibility = 'visible';
+
+  // Wait for fonts to render
+  await document.fonts.ready;
+  // Small extra delay to ensure layout is painted
+  await new Promise(r => setTimeout(r, 300));
 
   try {
     const canvas = await html2canvas(element, {
-      scale: 2,
+      scale: 1.5,
       useCORS: true,
       logging: false,
       backgroundColor: '#ffffff',
-      windowWidth: 1200
+      windowWidth: 800,
+      allowTaint: true,
+      foreignObjectRendering: false,
     });
 
     const imgData = canvas.toDataURL('image/png');
@@ -214,34 +226,29 @@ const exportElement = async (elementId, filename, format = 'pdf') => {
       link.click();
     } else {
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgProps = pdf.getImageProperties(imgData);
-      const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
-      const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      const imgWidth = 210; // A4 width in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
       let heightLeft = imgHeight;
       let position = 0;
 
-      // First page
-      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
       heightLeft -= pdfHeight;
 
-      // Subsequent pages
-      while (heightLeft > 0) {
+      while (heightLeft >= 0) {
         position = heightLeft - imgHeight;
         pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
         heightLeft -= pdfHeight;
       }
-
       pdf.save(`${filename}.pdf`);
     }
+  } catch (err) {
+    console.error("Export error:", err);
+    alert("Failed to export. Please try again.");
   } finally {
-    element.style.display = originalStyle;
-    element.style.position = '';
-    element.style.left = '';
-    element.style.top = '';
-    element.style.width = '';
+    element.style.visibility = originalVisibility;
   }
 };
 
@@ -335,8 +342,8 @@ const CatalogView = ({ lang, texts, searchQuery, setSearchQuery, appCategories, 
 
   return (
     <div className="max-w-screen-xl mx-auto px-4 py-8">
-      {/* SEARCH BAR & DOWNLOAD */}
-      <div className="mb-12 flex flex-col md:flex-row items-center justify-center gap-4">
+      {/* SEARCH BAR */}
+      <div className="mb-12 flex items-center justify-center">
         <div className="relative w-full max-w-md group">
           <input
             type="text"
@@ -355,33 +362,6 @@ const CatalogView = ({ lang, texts, searchQuery, setSearchQuery, appCategories, 
             </button>
           )}
         </div>
-        <button
-          onClick={() => exportElement('catalog-pdf-export', 'product-catalog', 'pdf')}
-          className="bg-navy text-white px-8 py-4 rounded-full font-cairo font-bold flex items-center gap-2 hover:bg-gold hover:text-navy transition-all shadow-lg group"
-        >
-          <FileText size={20} className="group-hover:animate-bounce" />
-          {lang === 'ar' ? 'تحميل الكتالوج PDF' : 'Download Catalog PDF'}
-        </button>
-      </div>
-
-      {/* CATEGORY NAVIGATOR (TEXT ONLY) */}
-      <div className="flex flex-wrap justify-center gap-3 mb-12">
-        {appCategories[lang].map(cat => {
-          const catName = cat.name[lang] || cat.name;
-          const isActive = searchQuery === catName || (cat.id === 'all' && (searchQuery === '' || searchQuery === 'All' || searchQuery === 'الكل'));
-          return (
-            <button
-              key={cat.id}
-              onClick={() => setSearchQuery(cat.id === 'all' ? '' : catName)}
-              className={`px-6 py-2.5 rounded-full font-cairo font-bold text-sm transition-all duration-300 border ${isActive
-                ? 'bg-navy text-white border-navy shadow-lg scale-105'
-                : 'bg-white text-gray-500 border-gray-100 hover:border-navy hover:text-navy'
-                }`}
-            >
-              {catName}
-            </button>
-          );
-        })}
       </div>
 
       {/* RESULTS */}
@@ -453,47 +433,121 @@ const OrderPage = ({ lang, texts, appCategories, products, cart, updateCart, nav
           <h1 className="text-4xl font-cairo text-navy font-bold mb-4">{lang === 'ar' ? 'تم استلام طلبك!' : 'Order Received!'}</h1>
           <p className="text-gray-500 font-cairo text-lg mb-12">{lang === 'ar' ? 'شكراً لثقتك بنا. يمكنك تحميل ملخص الطلب أدناه.' : 'Thank you for your trust. You can download your order summary below.'}</p>
 
-          {/* HIDDEN EXPORT AREA */}
-          <div id="client-order-export" className="hidden p-10 bg-white" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
-            <div className="flex justify-between items-center border-b-2 border-navy pb-6 mb-8">
-              <h2 className="text-2xl font-bold font-cairo text-navy uppercase">FREEZE DRY</h2>
-              <div className="text-right">
-                <p className="text-xs text-gray-400 font-cairo">{lang === 'ar' ? 'رقم الطلب' : 'Order ID'}: #{orderSuccess.id}</p>
-                <p className="text-xs text-gray-400 font-cairo">{orderSuccess.date}</p>
+          {/* HIDDEN EXPORT AREA - off-screen so fonts always load */}
+          <div
+            id="client-order-export"
+            dir={lang === 'ar' ? 'rtl' : 'ltr'}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: '-9999px',
+              width: '800px',
+              background: 'white',
+              fontFamily: "'Cairo', 'Noto Kufi Arabic', sans-serif",
+              zIndex: -1,
+              visibility: 'hidden',
+            }}
+          >
+            {/* Header Logo/Store Name */}
+            <div className="bg-navy p-8 text-white flex justify-between items-center">
+              <div>
+                <h2 className="text-3xl font-bold font-cairo uppercase tracking-widest">FREEZE DRY</h2>
+                <p className="text-xs opacity-70 mt-1">{lang === 'ar' ? 'حلويات فاخرة مجففة بالتجميد' : 'Premium Freeze-Dried Sweets'}</p>
+              </div>
+              <div className="text-left">
+                <p className="text-xs opacity-50" style={{letterSpacing: lang === 'ar' ? '0' : '0.1em'}}>{lang === 'ar' ? 'رقم الطلب' : 'Order ID'}</p>
+                <p className="text-xl font-bold">#{orderSuccess.id}</p>
               </div>
             </div>
-            <div className="mb-10">
-              <h3 className="text-sm font-bold text-gray-400 uppercase mb-4 tracking-widest">{lang === 'ar' ? 'معلومات العميل' : 'Customer Info'}</h3>
-              <div className="grid grid-cols-2 gap-4 font-cairo">
-                <div><span className="text-gray-400">{lang === 'ar' ? 'الاسم' : 'Name'}:</span> <span className="text-navy font-bold">{orderSuccess.customer.name}</span></div>
-                <div><span className="text-gray-400">{lang === 'ar' ? 'الهاتف' : 'Phone'}:</span> <span className="text-navy font-bold">{orderSuccess.customer.phone}</span></div>
-                <div className="col-span-2"><span className="text-gray-400">{lang === 'ar' ? 'العنوان' : 'Address'}:</span> <span className="text-navy font-bold">{orderSuccess.customer.city}, {orderSuccess.customer.address}</span></div>
+
+            <div className="p-10">
+              {/* SHIPPING INFO BLOCK */}
+              <div className="mb-8 overflow-hidden rounded-xl border border-gray-100 shadow-sm">
+                <div className="bg-navy/5 p-4 border-b border-gray-100">
+                  <h3 className="text-sm font-bold font-cairo text-navy">{lang === 'ar' ? 'معلومات الشحن' : 'Shipping Information'}</h3>
+                </div>
+                <div className="grid grid-cols-2 bg-white divide-x divide-y divide-gray-100 rtl:divide-x-reverse">
+                  <div className="p-4 flex flex-col gap-1">
+                    <span className="text-[10px] text-gray-400" style={{letterSpacing: lang === 'ar' ? '0' : '0.05em'}}>{lang === 'ar' ? 'الاسم الكامل' : 'Full Name'}</span>
+                    <span className="text-sm font-bold text-navy">{orderSuccess.customer.name}</span>
+                  </div>
+                  <div className="p-4 flex flex-col gap-1">
+                    <span className="text-[10px] text-gray-400" style={{letterSpacing: lang === 'ar' ? '0' : '0.05em'}}>{lang === 'ar' ? 'رقم الجوال' : 'Phone Number'}</span>
+                    <span className="text-sm font-bold text-navy text-left" dir="ltr">{orderSuccess.customer.phone}</span>
+                  </div>
+                  <div className="p-4 flex flex-col gap-1">
+                    <span className="text-[10px] text-gray-400" style={{letterSpacing: lang === 'ar' ? '0' : '0.05em'}}>{lang === 'ar' ? 'المدينة' : 'City'}</span>
+                    <span className="text-sm font-bold text-navy">{orderSuccess.customer.city}</span>
+                  </div>
+                  <div className="p-4 flex flex-col gap-1">
+                    <span className="text-[10px] text-gray-400" style={{letterSpacing: lang === 'ar' ? '0' : '0.05em'}}>{lang === 'ar' ? 'عنوان السكن' : 'Address'}</span>
+                    <span className="text-sm font-bold text-navy">{orderSuccess.customer.address}</span>
+                  </div>
+                </div>
               </div>
-            </div>
-            <table className="w-full text-right mb-10 border-collapse">
-              <thead className="bg-gray-50 border-b-2 border-gray-100">
-                <tr className="font-cairo text-[10px] text-gray-400 uppercase tracking-wider">
-                  <th className="p-4 text-center w-20">{lang === 'ar' ? 'الصورة' : 'Img'}</th>
-                  <th className="p-4">{lang === 'ar' ? 'المنتج' : 'Product'}</th>
-                  <th className="p-4 text-center">{lang === 'ar' ? 'الكمية' : 'Qty'}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orderSuccess.items.map((item, idx) => (
-                  <tr key={idx} className="border-b border-gray-50 font-cairo">
-                    <td className="p-3">
-                      {item.image && (
-                        <img src={item.image} className="w-12 h-12 object-cover rounded-lg shadow-sm mx-auto" alt="" />
-                      )}
-                    </td>
-                    <td className="p-3 text-navy font-bold text-sm">{item.name}</td>
-                    <td className="p-3 text-center text-navy font-bold text-sm">{item.qty}</td>
+
+              {/* PRODUCTS TABLE */}
+              <table className="w-full border-collapse rounded-xl overflow-hidden shadow-sm border border-gray-100 mb-8">
+                <thead className="bg-navy text-white text-xs font-cairo">
+                  <tr>
+                    <th className="p-4 text-center w-12">#</th>
+                    <th className="p-4 text-right">{lang === 'ar' ? 'تفاصيل المنتج' : 'Product Details'}</th>
+                    <th className="p-4 text-center w-20">{lang === 'ar' ? 'الكمية' : 'Qty'}</th>
+                    <th className="p-4 text-center w-32">{lang === 'ar' ? 'السعر' : 'Price'}</th>
+                    <th className="p-4 text-center w-32">{lang === 'ar' ? 'المجموع' : 'Total'}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="text-center text-[10px] text-gray-300 font-cairo mt-10">
-              {lang === 'ar' ? 'شكراً لشرائكم من فريز دراي' : 'Thank you for shopping at Freeze Dry'}
+                </thead>
+                <tbody className="font-cairo">
+                  {orderSuccess.items.map((item, idx) => (
+                    <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      <td className="p-4 text-center text-gray-400 font-bold border-b border-gray-100">{idx + 1}</td>
+                      <td className="p-4 border-b border-gray-100">
+                        <div className="flex items-center gap-4">
+                          {item.image && <img src={item.image} className="w-12 h-12 object-cover rounded-lg shadow-sm" alt="" />}
+                          <span className="text-sm font-bold text-navy">{item.name}</span>
+                        </div>
+                      </td>
+                      <td className="p-4 text-center border-b border-gray-100">
+                        <span className="bg-sand px-3 py-1 rounded-full text-xs font-bold text-navy">{item.qty}</span>
+                      </td>
+                      <td className="p-4 text-center border-b border-gray-100 text-sm font-bold text-gray-500">{item.price}</td>
+                      <td className="p-4 text-center border-b border-gray-100 text-sm font-bold text-navy">
+                        {parsePrice(item.price) * item.qty}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {/* TOTALS SECTION */}
+              <div className="flex flex-col items-end gap-2 font-cairo">
+                <div className="flex justify-between w-64 border-b border-gray-100 pb-2">
+                  <span className="text-gray-400 text-sm">{lang === 'ar' ? 'إجمالي المنتجات' : 'Subtotal'}</span>
+                  <span className="font-bold text-navy">
+                    {orderSuccess.items.reduce((sum, item) => sum + (parsePrice(item.price) * item.qty), 0)}
+                  </span>
+                </div>
+                <div className="flex justify-between w-64 border-b border-gray-100 pb-2">
+                  <span className="text-gray-400 text-sm">{lang === 'ar' ? 'رسوم التوصيل' : 'Delivery Fee'}</span>
+                  <span className="font-bold text-navy">0</span>
+                </div>
+                <div className="flex justify-between w-64 bg-navy p-4 rounded-xl text-white mt-2">
+                  <span className="font-bold">{lang === 'ar' ? 'المجموع النهائي' : 'Grand Total'}</span>
+                  <span className="text-xl font-bold">
+                    {orderSuccess.items.reduce((sum, item) => sum + (parsePrice(item.price) * item.qty), 0)}
+                  </span>
+                </div>
+              </div>
+
+              {/* FOOTER MESSAGE */}
+              <div className="mt-16 text-center border-t-2 border-dashed border-gray-100 pt-8">
+                <p className="text-lg font-cairo font-bold text-navy">
+                  {lang === 'ar' ? 'شكراً لتسوقكم من متجرنا ♥' : 'Thank you for shopping from our store ♥'}
+                </p>
+                <p className="text-[10px] text-gray-300 mt-2">
+                  {lang === 'ar' ? 'هذا المستند تم إنشاؤه تلقائياً' : 'This document was automatically generated'}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -548,6 +602,7 @@ const OrderPage = ({ lang, texts, appCategories, products, cart, updateCart, nav
                     id,
                     name: p ? getName(p, lang) : 'Unknown',
                     image: p ? p.images[0] : null,
+                    price: p ? getPrice(p, lang) : '0',
                     qty
                   };
                 }),
@@ -672,6 +727,7 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
   const [exportOrder, setExportOrder] = useState(null);
   const [productImage, setProductImage] = useState('');
   const [categoryImage, setCategoryImage] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     if (editingProduct) setProductImage(editingProduct.images[0]);
@@ -768,38 +824,50 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
   return (
     <div className="min-h-screen bg-gray-50 animate-fade-in pb-20">
       {/* ADMIN HEADER */}
-      <div className="bg-navy text-white p-6 shadow-lg sticky top-0 z-50">
-        <div className="max-w-screen-xl mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <LayoutDashboard className="text-gold" />
-            <h1 className="text-xl font-bold font-cairo tracking-widest uppercase">{lang === 'ar' ? 'لوحة التحكم' : 'Admin Dashboard'}</h1>
+      <div className="bg-navy text-white shadow-lg sticky top-0 z-50">
+        {/* Top row: title + store + logout */}
+        <div className="max-w-screen-xl mx-auto px-4 py-3 flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <LayoutDashboard className="text-gold" size={18} />
+            <h1 className="text-sm md:text-xl font-bold font-cairo tracking-widest uppercase">{lang === 'ar' ? 'لوحة التحكم' : 'Admin'}</h1>
           </div>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => exportElement('catalog-pdf-export', 'product-catalog', 'pdf')}
-              className="bg-gold text-navy px-6 py-2 rounded-lg font-cairo font-bold flex items-center gap-2 hover:shadow-lg transition-all"
-            >
-              <FileText size={18} /> {lang === 'ar' ? 'تصدير الكتالوج PDF' : 'Export Catalog PDF'}
-            </button>
-            <button onClick={() => navigateTo('home')} className="text-sm font-cairo border border-white/20 px-4 py-2 rounded-lg hover:bg-white/10">{lang === 'ar' ? 'المتجر' : 'Store'}</button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => navigateTo('home')} className="text-xs md:text-sm font-cairo border border-white/20 px-3 py-1.5 rounded-lg hover:bg-white/10">{lang === 'ar' ? 'المتجر' : 'Store'}</button>
             <button
               onClick={() => { setIsAdminAuthenticated(false); navigateTo('home'); }}
-              className="text-sm font-cairo bg-red-500/20 text-red-100 px-4 py-2 rounded-lg hover:bg-red-500/40 flex items-center gap-2"
+              className="text-xs md:text-sm font-cairo bg-red-500/20 text-red-100 px-3 py-1.5 rounded-lg hover:bg-red-500/40 flex items-center gap-1"
             >
-              <LogOut size={16} /> {lang === 'ar' ? 'خروج' : 'Logout'}
+              <LogOut size={14} /> {lang === 'ar' ? 'خروج' : 'Logout'}
             </button>
           </div>
         </div>
+        {/* Bottom row: PDF export button */}
+        <div className="max-w-screen-xl mx-auto px-4 pb-3">
+          <button
+            onClick={async () => {
+              setIsExporting(true);
+              await exportElement('catalog-pdf-export', 'product-catalog', 'pdf');
+              setIsExporting(false);
+            }}
+            disabled={isExporting}
+            className={`w-full md:w-auto bg-gold text-navy px-4 py-2 rounded-lg font-cairo font-bold flex items-center justify-center gap-2 hover:shadow-lg transition-all text-sm ${isExporting ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            <FileText size={16} className={isExporting ? 'animate-spin' : ''} />
+            {isExporting
+              ? (lang === 'ar' ? 'جاري التحميل...' : 'Downloading...')
+              : (lang === 'ar' ? 'تصدير الكتالوج PDF' : 'Export Catalog PDF')}
+          </button>
+        </div>
       </div>
 
-      <div className="max-w-screen-xl mx-auto mt-10 px-4">
+      <div className="max-w-screen-xl mx-auto mt-6 px-4">
         {/* TABS */}
-        <div className="flex gap-4 mb-8 overflow-x-auto pb-2 scrollbar-hide">
+        <div className="flex gap-2 mb-8 overflow-x-auto pb-2 scrollbar-hide">
           {['products', 'categories', 'orders', 'banner', 'settings'].map(tab => (
             <button
               key={tab}
               onClick={() => setAdminTab(tab)}
-              className={`px-8 py-3 rounded-xl font-cairo font-bold transition-all whitespace-nowrap shadow-sm border ${adminTab === tab ? 'bg-navy text-white border-navy ring-4 ring-navy/10 scale-105' : 'bg-white text-gray-400 border-gray-100 hover:border-navy hover:text-navy'}`}
+              className={`px-4 md:px-8 py-2 md:py-3 rounded-xl font-cairo font-bold transition-all whitespace-nowrap shadow-sm border text-xs md:text-sm ${adminTab === tab ? 'bg-navy text-white border-navy ring-2 ring-navy/10 scale-105' : 'bg-white text-gray-400 border-gray-100 hover:border-navy hover:text-navy'}`}
             >
               {tab === 'products' && (lang === 'ar' ? 'المنتجات' : 'Products')}
               {tab === 'categories' && (lang === 'ar' ? 'الأقسام' : 'Categories')}
@@ -1436,7 +1504,7 @@ export default function App() {
       {activePage === 'home' && (
         <div className="animate-fade-in">
           {/* PREMIUM HERO BANNER */}
-          <section className="relative w-full h-[70vh] min-h-[500px] overflow-hidden bg-navy flex items-center justify-center">
+          <section className="relative mx-4 mt-6 rounded-3xl md:mx-0 md:mt-0 md:rounded-none overflow-hidden bg-navy flex items-center justify-center shadow-2xl h-[40vh] md:h-[70vh] min-h-[300px] md:min-h-[500px]">
             {bannerData.mediaType === 'video' ? (
               <video
                 autoPlay
@@ -1456,21 +1524,21 @@ export default function App() {
             <div className="absolute inset-0 bg-gradient-to-t from-navy via-navy/20 to-navy/10"></div>
 
             <div className="relative z-10 text-center px-6 max-w-5xl">
-              <h2 className="text-white text-5xl md:text-8xl font-bold font-cairo mb-8 animate-slide-up drop-shadow-2xl">
+              <h2 className="text-white text-3xl md:text-8xl font-bold font-cairo mb-4 md:mb-8 animate-slide-up drop-shadow-2xl">
                 {bannerData.title[lang]}
               </h2>
-              <div className="flex items-center justify-center gap-6 animate-slide-up delay-100">
-                <div className="h-[2px] w-12 bg-gold hidden md:block"></div>
-                <p className="text-gold text-lg md:text-2xl font-cairo tracking-[0.3em] uppercase opacity-90">
+              <div className="flex items-center justify-center gap-3 md:gap-6 animate-slide-up delay-100">
+                <div className="h-[1px] md:h-[2px] w-8 md:w-12 bg-gold hidden md:block"></div>
+                <p className="text-gold text-sm md:text-2xl font-cairo tracking-[0.2em] md:tracking-[0.3em] uppercase opacity-90">
                   {bannerData.subtitle[lang]}
                 </p>
-                <div className="h-[2px] w-12 bg-gold hidden md:block"></div>
+                <div className="h-[1px] md:h-[2px] w-8 md:w-12 bg-gold hidden md:block"></div>
               </div>
             </div>
           </section>
 
           {/* HERO / ABOUT US SECTION */}
-          <section className="bg-white py-24 border-b border-gray-100">
+          <section className="bg-white py-12 md:py-24 border-b border-gray-100">
             <div className="max-w-screen-md mx-auto px-6 text-center">
               <div className="mb-8 flex justify-center">
                 <img src="/images/logo.png" alt="Logo" className="h-24 w-auto" />
