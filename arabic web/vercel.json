@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:match*",
+      "destination": "https://arabicbackend.vercel.app/api/:match*"
+    },
+    {
+      "source": "/uploads/:match*",
+      "destination": "https://arabicbackend.vercel.app/uploads/:match*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
