@@ -905,7 +905,7 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
     const categoryPayload = {
       nameAr,
       nameEn,
-      slug: (nameEn || 'cat').toLowerCase().replace(/\s+/g, '-'),
+      slug: (nameEn || 'cat').toLowerCase().replace(/\s+/g, '-') + '-' + Date.now().toString(36),
       image: categoryImage || formData.get('image') || '/images/cat-all.jpg'
     };
 
@@ -921,10 +921,11 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
       if (data.success) {
         window.location.reload();
       } else {
-        alert(lang === 'ar' ? 'حدث خطأ' : 'Error saving category');
+        alert((lang === 'ar' ? 'حدث خطأ: ' : 'Error saving category: ') + (data.message || 'Unknown error'));
       }
     } catch (err) {
       console.error(err);
+      alert((lang === 'ar' ? 'حدث خطأ في الاتصال' : 'Connection error'));
     }
   };
 
@@ -973,7 +974,7 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
           {['products', 'categories', 'orders', 'banner', 'settings', 'footer'].map(tab => (
             <button
               key={tab}
-              onClick={() => setAdminTab(tab)}
+              onClick={() => { setAdminTab(tab); localStorage.setItem('adminTab', tab); }}
               className={`px-4 md:px-8 py-2 md:py-3 rounded-xl font-cairo font-bold transition-all whitespace-nowrap shadow-sm border text-xs md:text-sm ${adminTab === tab ? 'bg-navy text-white border-navy ring-2 ring-navy/10 scale-105' : 'bg-white text-gray-400 border-gray-100 hover:border-navy hover:text-navy'}`}
             >
               {tab === 'products' && (lang === 'ar' ? 'المنتجات' : 'Products')}
@@ -1673,7 +1674,7 @@ export default function App() {
   const [isZoomOpen, setIsZoomOpen] = useState(false);
   const [zoomImage, setZoomImage] = useState(null);
 
-  const [adminTab, setAdminTab] = useState('products');
+  const [adminTab, setAdminTab] = useState(() => localStorage.getItem('adminTab') || 'products');
   const [isAdminAuthOpen, setIsAdminAuthOpen] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(() => !!localStorage.getItem('adminToken'));
   const [authError, setAuthError] = useState('');
@@ -2067,6 +2068,7 @@ export default function App() {
                 const data = await res.json();
                 if (data.success && data.data.token) {
                   localStorage.setItem('adminToken', data.data.token);
+                  localStorage.setItem('activePage', 'admin');
                   setIsAdminAuthenticated(true);
                   setIsAdminAuthOpen(false);
                   setActivePage('admin');
