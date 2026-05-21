@@ -217,13 +217,32 @@ const exportElement = async (elementId, filename, format = 'pdf') => {
 
   try {
     const canvas = await html2canvas(element, {
-      scale: 1.5,
+      scale: 2,
       useCORS: true,
       logging: false,
       backgroundColor: '#ffffff',
       windowWidth: 800,
       allowTaint: true,
-      foreignObjectRendering: false,
+      onclone: (clonedDoc) => {
+        const clonedElement = clonedDoc.getElementById(elementId);
+        if (clonedElement) {
+          // Force all product names to be visible and unclipped
+          const titles = clonedElement.querySelectorAll('h3');
+          titles.forEach(t => {
+            t.style.display = 'block';
+            t.style.webkitLineClamp = 'unset';
+            t.style.lineClamp = 'unset';
+            t.style.maxHeight = 'none';
+            t.style.minHeight = 'none';
+            t.style.overflow = 'visible';
+            t.style.paddingBottom = '5px'; // Small buffer
+          });
+          
+          // Remove any sticky/fixed elements that might block view during capture
+          const forbidden = clonedElement.querySelectorAll('header, .sticky, .fixed');
+          forbidden.forEach(el => el.style.display = 'none');
+        }
+      }
     });
 
     const imgData = canvas.toDataURL('image/png');
@@ -284,8 +303,8 @@ const ProductCard = ({ product, lang, showPricesPublicly, showControls, activePa
       )}
     </div>
     <div className="text-center">
-      <h3 className="font-cairo text-[10px] md:text-base text-navy leading-tight mb-1 md:mb-2 font-bold line-clamp-2 h-6 md:h-10">{getName(product, lang)}</h3>
-      {(showPricesPublicly || showControls || activePage === 'admin') && (
+      <h3 className="font-cairo text-[10px] md:text-base text-navy leading-tight mb-1 md:mb-2 font-bold line-clamp-2 min-h-[2.8em] flex items-center justify-center">{getName(product, lang)}</h3>
+      {(showPricesPublicly || activePage === 'admin') && (
         <div className="text-gold font-bold font-cairo text-[9px] md:text-sm mb-1 md:mb-3">
           {getPrice(product, lang)}
         </div>
@@ -378,10 +397,10 @@ const CatalogView = ({ lang, texts, searchQuery, setSearchQuery, appCategories, 
         categoriesWithProducts.map((category) => (
           <section key={category.id} className="mb-20">
             <div className="mb-12 relative h-48 md:h-80 rounded-2xl overflow-hidden shadow-2xl group cursor-default">
-              <img 
-                src={category.image} 
-                alt={category.name[lang]} 
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000" 
+              <img
+                src={category.image}
+                alt={category.name[lang]}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000"
               />
               <div className="absolute inset-0 bg-gradient-to-b from-navy/20 via-navy/40 to-navy/70 flex flex-col items-center justify-center p-6 text-center">
                 <div className="w-12 h-1 bg-gold mb-4 animate-pulse"></div>
@@ -426,7 +445,7 @@ const CatalogView = ({ lang, texts, searchQuery, setSearchQuery, appCategories, 
   );
 };
 
-const OrderPage = ({ lang, texts, appCategories, products, cart, updateCart, navigateTo, setCart }) => {
+const OrderPage = ({ lang, texts, appCategories, products, cart, updateCart, navigateTo, setCart, showOrderPrices }) => {
   const [orderSuccess, setOrderSuccess] = useState(null);
 
   if (orderSuccess) {
@@ -461,7 +480,7 @@ const OrderPage = ({ lang, texts, appCategories, products, cart, updateCart, nav
                 <p className="text-xs opacity-70 mt-1">{lang === 'ar' ? 'حلويات فاخرة مجففة بالتجميد' : 'Premium Freeze-Dried Sweets'}</p>
               </div>
               <div className="text-left">
-                <p className="text-xs opacity-50" style={{letterSpacing: lang === 'ar' ? '0' : '0.1em'}}>{lang === 'ar' ? 'رقم الطلب' : 'Order ID'}</p>
+                <p className="text-xs opacity-50" style={{ letterSpacing: lang === 'ar' ? '0' : '0.1em' }}>{lang === 'ar' ? 'رقم الطلب' : 'Order ID'}</p>
                 <p className="text-xl font-bold">#{orderSuccess.id}</p>
               </div>
             </div>
@@ -474,19 +493,19 @@ const OrderPage = ({ lang, texts, appCategories, products, cart, updateCart, nav
                 </div>
                 <div className="grid grid-cols-2 bg-white divide-x divide-y divide-gray-100 rtl:divide-x-reverse">
                   <div className="p-4 flex flex-col gap-1">
-                    <span className="text-[10px] text-gray-400" style={{letterSpacing: lang === 'ar' ? '0' : '0.05em'}}>{lang === 'ar' ? 'الاسم الكامل' : 'Full Name'}</span>
+                    <span className="text-[10px] text-gray-400" style={{ letterSpacing: lang === 'ar' ? '0' : '0.05em' }}>{lang === 'ar' ? 'الاسم الكامل' : 'Full Name'}</span>
                     <span className="text-sm font-bold text-navy">{orderSuccess.customer.name}</span>
                   </div>
                   <div className="p-4 flex flex-col gap-1 items-center text-center">
-                    <span className="text-[10px] text-gray-400" style={{letterSpacing: lang === 'ar' ? '0' : '0.05em'}}>{lang === 'ar' ? 'رقم الجوال' : 'Phone Number'}</span>
+                    <span className="text-[10px] text-gray-400" style={{ letterSpacing: lang === 'ar' ? '0' : '0.05em' }}>{lang === 'ar' ? 'رقم الجوال' : 'Phone Number'}</span>
                     <span className="text-sm font-bold text-navy" dir="ltr">{orderSuccess.customer.phone}</span>
                   </div>
                   <div className="p-4 flex flex-col gap-1">
-                    <span className="text-[10px] text-gray-400" style={{letterSpacing: lang === 'ar' ? '0' : '0.05em'}}>{lang === 'ar' ? 'المدينة' : 'City'}</span>
+                    <span className="text-[10px] text-gray-400" style={{ letterSpacing: lang === 'ar' ? '0' : '0.05em' }}>{lang === 'ar' ? 'المدينة' : 'City'}</span>
                     <span className="text-sm font-bold text-navy">{orderSuccess.customer.city}</span>
                   </div>
                   <div className="p-4 flex flex-col gap-1">
-                    <span className="text-[10px] text-gray-400" style={{letterSpacing: lang === 'ar' ? '0' : '0.05em'}}>{lang === 'ar' ? 'عنوان السكن' : 'Address'}</span>
+                    <span className="text-[10px] text-gray-400" style={{ letterSpacing: lang === 'ar' ? '0' : '0.05em' }}>{lang === 'ar' ? 'عنوان السكن' : 'Address'}</span>
                     <span className="text-sm font-bold text-navy">{orderSuccess.customer.address}</span>
                   </div>
                 </div>
@@ -499,8 +518,12 @@ const OrderPage = ({ lang, texts, appCategories, products, cart, updateCart, nav
                     <th className="p-4 text-center w-12">#</th>
                     <th className="p-4 text-right">{lang === 'ar' ? 'تفاصيل المنتج' : 'Product Details'}</th>
                     <th className="p-4 text-center w-20">{lang === 'ar' ? 'الكمية' : 'Qty'}</th>
-                    <th className="p-4 text-center w-32">{lang === 'ar' ? 'السعر' : 'Price'}</th>
-                    <th className="p-4 text-center w-32">{lang === 'ar' ? 'المجموع' : 'Total'}</th>
+                    {showOrderPrices && (
+                      <>
+                        <th className="p-4 text-center w-32">{lang === 'ar' ? 'السعر' : 'Price'}</th>
+                        <th className="p-4 text-center w-32">{lang === 'ar' ? 'المجموع' : 'Total'}</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="font-cairo">
@@ -516,34 +539,36 @@ const OrderPage = ({ lang, texts, appCategories, products, cart, updateCart, nav
                       <td className="p-4 text-center border-b border-gray-100">
                         <span className="bg-sand px-3 py-1 rounded-full text-xs font-bold text-navy">{item.qty}</span>
                       </td>
-                      <td className="p-4 text-center border-b border-gray-100 text-sm font-bold text-gray-500">{item.price}</td>
-                      <td className="p-4 text-center border-b border-gray-100 text-sm font-bold text-navy">
-                        {parsePrice(item.price) * item.qty}
-                      </td>
+                      {showOrderPrices && (
+                        <>
+                          <td className="p-4 text-center border-b border-gray-100 text-sm font-bold text-gray-500">{item.price}</td>
+                          <td className="p-4 text-center border-b border-gray-100 text-sm font-bold text-navy">
+                            {parsePrice(item.price) * item.qty} ₪
+                          </td>
+                        </>
+                      )}
                     </tr>
                   ))}
                 </tbody>
               </table>
 
               {/* TOTALS SECTION */}
-              <div className="flex flex-col items-end gap-2 font-cairo">
-                <div className="flex justify-between w-64 border-b border-gray-100 pb-2">
-                  <span className="text-gray-400 text-sm">{lang === 'ar' ? 'إجمالي المنتجات' : 'Subtotal'}</span>
-                  <span className="font-bold text-navy">
-                    {orderSuccess.items.reduce((sum, item) => sum + (parsePrice(item.price) * item.qty), 0)}
-                  </span>
+              {showOrderPrices && (
+                <div className="flex flex-col items-end gap-2 font-cairo">
+                  <div className="flex justify-between w-64 border-b border-gray-100 pb-2">
+                    <span className="text-gray-400 text-sm">{lang === 'ar' ? 'إجمالي المنتجات' : 'Subtotal'}</span>
+                    <span className="font-bold text-navy">
+                      {orderSuccess.items.reduce((sum, item) => sum + (parsePrice(item.price) * item.qty), 0)} ₪
+                    </span>
+                  </div>
+                  <div className="flex justify-between w-64 bg-navy p-4 rounded-xl text-white mt-2">
+                    <span className="font-bold">{lang === 'ar' ? 'المجموع النهائي' : 'Grand Total'}</span>
+                    <span className="text-xl font-bold">
+                      {orderSuccess.items.reduce((sum, item) => sum + (parsePrice(item.price) * item.qty), 0)} ₪
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between w-64 border-b border-gray-100 pb-2">
-                  <span className="text-gray-400 text-sm">{lang === 'ar' ? 'رسوم التوصيل' : 'Delivery Fee'}</span>
-                  <span className="font-bold text-navy">0</span>
-                </div>
-                <div className="flex justify-between w-64 bg-navy p-4 rounded-xl text-white mt-2">
-                  <span className="font-bold">{lang === 'ar' ? 'المجموع النهائي' : 'Grand Total'}</span>
-                  <span className="text-xl font-bold">
-                    {orderSuccess.items.reduce((sum, item) => sum + (parsePrice(item.price) * item.qty), 0)}
-                  </span>
-                </div>
-              </div>
+              )}
 
               {/* FOOTER MESSAGE */}
               <div className="mt-16 text-center border-t-2 border-dashed border-gray-100 pt-8">
@@ -593,7 +618,7 @@ const OrderPage = ({ lang, texts, appCategories, products, cart, updateCart, nav
             <form className="space-y-4" onSubmit={async (e) => {
               e.preventDefault();
               const formData = new FormData(e.target);
-              
+
               const backendItems = Object.entries(cart).map(([id, qty]) => {
                 const p = products.find(prod => prod.id == id);
                 return {
@@ -605,7 +630,7 @@ const OrderPage = ({ lang, texts, appCategories, products, cart, updateCart, nav
                   image: p ? p.images[0] : ''
                 };
               });
-              
+
               const totalAmount = backendItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
 
               const orderPayload = {
@@ -624,7 +649,7 @@ const OrderPage = ({ lang, texts, appCategories, products, cart, updateCart, nav
                   body: JSON.stringify(orderPayload)
                 });
                 const data = await res.json();
-                
+
                 if (data.success) {
                   const dbOrder = data.data;
                   setOrderSuccess({
@@ -672,14 +697,25 @@ const OrderPage = ({ lang, texts, appCategories, products, cart, updateCart, nav
                 <textarea required name="address" rows="2" className="w-full p-2.5 bg-warmwhite border border-gray-100 rounded-lg focus:border-navy outline-none font-cairo text-sm resize-none"></textarea>
               </div>
 
-              <div className="pt-4">
-                <div className="flex justify-between items-center mb-4">
-                  <span className="font-cairo text-gray-400 text-sm">{texts.total}</span>
-                  <span className="font-cairo text-xl font-bold text-navy">
+              <div className="pt-4 border-t border-gray-100 mt-4">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="font-cairo text-gray-400 text-xs">{lang === 'ar' ? 'عدد الأصناف' : 'Total Items'}</span>
+                  <span className="font-cairo text-sm font-bold text-navy">
                     {Object.values(cart).reduce((a, b) => a + b, 0)} {lang === 'ar' ? 'قطع' : 'items'}
                   </span>
                 </div>
-                <button type="submit" className="w-full py-4 bg-navy text-white font-cairo font-bold uppercase tracking-widest rounded-xl hover:shadow-lg transition-all flex items-center justify-center gap-2 text-sm">
+                {showOrderPrices && (
+                   <div className="flex justify-between items-center mb-6">
+                     <span className="font-cairo text-gray-400 text-xs">{lang === 'ar' ? 'المجموع الكلي' : 'Grand Total'}</span>
+                     <span className="font-cairo text-xl font-bold text-gold">
+                       {Object.entries(cart).reduce((sum, [id, qty]) => {
+                         const p = products.find(prod => prod.id == id);
+                         return sum + (p ? parsePrice(p.price.en) * qty : 0);
+                       }, 0)} ₪
+                     </span>
+                   </div>
+                )}
+                <button type="submit" className="w-full py-4 bg-navy text-white font-cairo font-bold uppercase tracking-widest rounded-xl hover:shadow-lg transition-all flex items-center justify-center gap-2 text-sm shadow-xl">
                   <ShoppingBag size={18} />
                   {texts.submitOrder}
                 </button>
@@ -703,6 +739,7 @@ const OrderPage = ({ lang, texts, appCategories, products, cart, updateCart, nav
                       product={product}
                       lang={lang}
                       showControls={true}
+                      showPricesPublicly={showOrderPrices}
                       cart={cart}
                       updateCart={updateCart}
                     />
@@ -717,7 +754,7 @@ const OrderPage = ({ lang, texts, appCategories, products, cart, updateCart, nav
   );
 };
 
-const AboutPage = ({ texts, lang }) => (
+const AboutPage = ({ texts, lang, aboutStore }) => (
   <div className="max-w-screen-md mx-auto px-6 py-24 animate-fade-in">
     <div className="text-center mb-16">
       <img src="/images/logo.png" alt="Logo" className="h-32 w-auto mx-auto mb-8" />
@@ -729,7 +766,7 @@ const AboutPage = ({ texts, lang }) => (
       <section className="bg-white p-10 rounded-3xl border border-gray-100 shadow-sm">
         <h2 className="text-3xl font-cairo text-navy font-bold mb-6 border-r-4 border-gold pr-4">{texts.aboutTitle}</h2>
         <p className="text-xl text-gray-600 font-cairo leading-relaxed">
-          {texts.aboutStore}
+          {aboutStore[lang]}
         </p>
       </section>
 
@@ -757,7 +794,7 @@ const AboutPage = ({ texts, lang }) => (
   </div>
 );
 
-const AdminView = ({ lang, products, setProducts, appCategories, setAppCategories, bannerData, setBannerData, footerData, setFooterData, showPricesPublicly, setShowPricesPublicly, adminTab, setAdminTab, navigateTo, setIsAdminAuthenticated }) => {
+const AdminView = ({ lang, products, setProducts, appCategories, setAppCategories, bannerData, setBannerData, aboutStore, setAboutStore, footerData, setFooterData, showPricesPublicly, setShowPricesPublicly, showOrderPrices, setShowOrderPrices, adminTab, setAdminTab, navigateTo, setIsAdminAuthenticated }) => {
   const [orders, setOrders] = useState([]);
   const [editingProduct, setEditingProduct] = useState(null);
   const [editingCategory, setEditingCategory] = useState(null);
@@ -1011,10 +1048,10 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
                     <div className="flex gap-2">
                       <button onClick={() => { setEditingProduct(p); setIsAddProductOpen(true); }} className="p-2 text-navy hover:bg-navy hover:text-white rounded-lg transition-colors border border-gray-100"><Settings size={18} /></button>
                       <button onClick={async () => {
-                        if(confirm('Are you sure?')) {
+                        if (confirm('Are you sure?')) {
                           try {
                             const token = localStorage.getItem('adminToken');
-                            const res = await fetch(`/api/admin/products/${p.id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }});
+                            const res = await fetch(`/api/admin/products/${p.id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
                             if (res.ok) window.location.reload();
                           } catch (e) { console.error(e); }
                         }
@@ -1064,7 +1101,7 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
                         if (confirm('Are you sure?')) {
                           try {
                             const token = localStorage.getItem('adminToken');
-                            const res = await fetch(`/api/admin/categories/${cat.id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }});
+                            const res = await fetch(`/api/admin/categories/${cat.id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
                             if (res.ok) window.location.reload();
                             else {
                               const data = await res.json();
@@ -1165,7 +1202,7 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
             <form onSubmit={async (e) => {
               e.preventDefault();
               const formData = new FormData(e.target);
-              
+
               const payload = {
                 bannerTitleAr: formData.get('titleAr'),
                 bannerTitleEn: formData.get('titleEn'),
@@ -1173,6 +1210,8 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
                 bannerSubtitleEn: formData.get('subtitleEn'),
                 bannerMediaType: formData.get('mediaType'),
                 bannerMediaUrl: bannerData.mediaUrl,
+                aboutStoreAr: formData.get('aboutStoreAr'),
+                aboutStoreEn: formData.get('aboutStoreEn'),
                 showPrices: showPricesPublicly
               };
 
@@ -1189,7 +1228,7 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
                 } else {
                   alert('Error saving settings');
                 }
-              } catch(err) {
+              } catch (err) {
                 console.error(err);
               }
             }} className="space-y-6">
@@ -1208,6 +1247,14 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
               <div>
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-2">Subtitle (EN)</label>
                 <input name="subtitleEn" defaultValue={bannerData.subtitle.en} className="w-full p-3 border rounded-xl outline-none focus:border-navy" />
+              </div>
+              <div className="border-t border-gray-100 pt-6">
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-2">About Store (AR)</label>
+                <textarea name="aboutStoreAr" defaultValue={aboutStore.ar} className="w-full p-3 border rounded-xl outline-none focus:border-navy h-32 font-cairo" />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-2">About Store (EN)</label>
+                <textarea name="aboutStoreEn" defaultValue={aboutStore.en} className="w-full p-3 border rounded-xl outline-none focus:border-navy h-32 font-cairo" />
               </div>
               <div>
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-2">{lang === 'ar' ? 'نوع الميديا' : 'Media Type'}</label>
@@ -1290,6 +1337,40 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
                 <div className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-sm transition-all ${showPricesPublicly ? (lang === 'ar' ? '-translate-x-7' : 'translate-x-7') : (lang === 'ar' ? '-translate-x-1' : 'translate-x-1')}`}></div>
               </button>
             </div>
+            <div className="flex items-center justify-between py-6 border-b border-gray-50">
+              <div>
+                <span className="font-cairo font-bold text-navy block">{lang === 'ar' ? 'إظهار السعر في صفحة الطلب' : 'Show prices on Order Page'}</span>
+                <p className="text-xs text-gray-400 mt-1">{lang === 'ar' ? 'إظهار المجموع النهائي للعميل' : 'Show grand total to customer'}</p>
+              </div>
+              <button
+                onClick={async () => {
+                  try {
+                    const token = localStorage.getItem('adminToken');
+                    const payload = {
+                      bannerTitleAr: bannerData.title.ar,
+                      bannerTitleEn: bannerData.title.en,
+                      bannerSubtitleAr: bannerData.subtitle.ar,
+                      bannerSubtitleEn: bannerData.subtitle.en,
+                      bannerMediaType: bannerData.mediaType,
+                      bannerMediaUrl: bannerData.mediaUrl,
+                      showPrices: showPricesPublicly,
+                      showOrderPrices: !showOrderPrices
+                    };
+                    const res = await fetch('/api/admin/settings', {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                      body: JSON.stringify(payload)
+                    });
+                    if (res.ok) {
+                      setShowOrderPrices(!showOrderPrices);
+                    }
+                  } catch (e) { console.error(e); }
+                }}
+                className={`w-14 h-8 rounded-full transition-all relative ${showOrderPrices ? 'bg-navy' : 'bg-gray-200'}`}
+              >
+                <div className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-sm transition-all ${showOrderPrices ? (lang === 'ar' ? '-translate-x-7' : 'translate-x-7') : (lang === 'ar' ? '-translate-x-1' : 'translate-x-1')}`}></div>
+              </button>
+            </div>
 
             {/* CHANGE PASSWORD SECTION */}
             <div className="py-6 border-b border-gray-50">
@@ -1312,7 +1393,7 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
                   const token = localStorage.getItem('adminToken');
                   const res = await fetch('/api/admin/change-password', {
                     method: 'POST',
-                    headers: { 
+                    headers: {
                       'Content-Type': 'application/json',
                       'Authorization': `Bearer ${token}`
                     },
@@ -1430,8 +1511,8 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
 
       {/* HIDDEN ADMIN ORDER EXPORT AREA */}
       {exportOrder && (
-        <div 
-          id="admin-order-export" 
+        <div
+          id="admin-order-export"
           dir={lang === 'ar' ? 'rtl' : 'ltr'}
           style={{
             position: 'fixed',
@@ -1670,6 +1751,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const [showPricesPublicly, setShowPricesPublicly] = useState(false);
+  const [showOrderPrices, setShowOrderPrices] = useState(false);
   const [cart, setCart] = useState({});
   const [isZoomOpen, setIsZoomOpen] = useState(false);
   const [zoomImage, setZoomImage] = useState(null);
@@ -1685,6 +1767,10 @@ export default function App() {
     subtitle: { ar: 'حلويات فاخرة مجففة بالتجميد', en: 'Premium Freeze-Dried Sweets' },
     mediaUrl: 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?auto=format&fit=crop&q=80&w=2000',
     mediaType: 'image'
+  });
+  const [aboutStore, setAboutStore] = useState({
+    ar: 'مرحباً بكم في فريز دراي، وجهتكم الأولى لأجود أنواع الحلويات والوجبات الخفيفة المجففة بالتجميد. نحن نفخر بتقديم تجربة طعم فريدة تجمع بين الجودة والابتكار، حيث نستخدم أحدث التقنيات لضمان الحفاظ على النكهة والقيمة الغذائية.',
+    en: 'Welcome to Freeze Dry, your premier destination for the finest freeze-dried sweets and snacks. We pride ourselves on offering a unique taste experience that combines high quality and innovation, using the latest technologies to ensure flavor and nutritional value are preserved.'
   });
 
   const [footerData, setFooterData] = useState({
@@ -1722,11 +1808,16 @@ export default function App() {
 
         if (settingsRes.success && settingsRes.data) {
           setShowPricesPublicly(settingsRes.data.showPrices);
+          setShowOrderPrices(settingsRes.data.showOrderPrices || false);
           setBannerData({
-            title: { ar: settingsRes.data.bannerTitleAr || 'عالم من النكهات', en: settingsRes.data.bannerTitleEn || 'World of Flavors' },
-            subtitle: { ar: settingsRes.data.bannerSubtitleAr || '', en: settingsRes.data.bannerSubtitleEn || '' },
+            title: { ar: settingsRes.data.bannerTitleAr ?? 'عالم من النكهات', en: settingsRes.data.bannerTitleEn ?? 'World of Flavors' },
+            subtitle: { ar: settingsRes.data.bannerSubtitleAr ?? '', en: settingsRes.data.bannerSubtitleEn ?? '' },
             mediaUrl: settingsRes.data.bannerMediaUrl || 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?auto=format&fit=crop&q=80&w=2000',
             mediaType: settingsRes.data.bannerMediaType || 'image'
+          });
+          setAboutStore({
+            ar: settingsRes.data.aboutStoreAr ?? 'مرحباً بكم في فريز دراي، وجهتكم الأولى لأجود أنواع الحلويات والوجبات الخفيفة المجففة بالتجميد.',
+            en: settingsRes.data.aboutStoreEn ?? 'Welcome to Freeze Dry, your premier destination for the finest freeze-dried sweets and snacks.'
           });
           setFooterData({
             phone: settingsRes.data.footerPhone || '+966 50 000 0000',
@@ -1818,8 +1909,8 @@ export default function App() {
     <button
       onClick={() => navigateTo(page)}
       className={`text-sm uppercase tracking-widest font-cairo transition-all duration-300 ${activePage === page
-          ? 'text-navy border-b border-navy pb-1'
-          : 'text-gray-500 hover:text-navy'
+        ? 'text-navy border-b border-navy pb-1'
+        : 'text-gray-500 hover:text-navy'
         }`}
     >
       {label}
@@ -1894,35 +1985,33 @@ export default function App() {
       {activePage === 'home' && (
         <div className="animate-fade-in">
           {/* PREMIUM HERO BANNER */}
-          <section className="relative mx-4 mt-6 rounded-3xl md:mx-0 md:mt-0 md:rounded-none overflow-hidden bg-navy flex items-center justify-center shadow-2xl h-[40vh] md:h-[70vh] min-h-[300px] md:min-h-[500px]">
+          <section className="relative mx-4 mt-6 rounded-3xl md:mx-0 md:mt-0 md:rounded-none overflow-hidden bg-white flex items-center justify-center shadow-x h-[40vh] md:h-[70vh] min-h-[300px] md:min-h-[500px]">
             {bannerData.mediaType === 'video' ? (
               <video
                 autoPlay
                 muted
                 loop
                 playsInline
-                className="absolute inset-0 w-full h-full object-cover opacity-60"
+                className="absolute inset-0 w-full h-full object-cover"
                 src={bannerData.mediaUrl}
               />
             ) : (
               <img
                 src={bannerData.mediaUrl}
-                className="absolute inset-0 w-full h-full object-cover opacity-60"
+                className="absolute inset-0 w-full h-full object-cover"
                 alt="Banner"
               />
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-navy via-navy/20 to-navy/10"></div>
+            <div className="absolute inset-0 bg-black/30"></div>
 
             <div className="relative z-10 text-center px-6 max-w-5xl">
               <h2 className="text-white text-3xl md:text-8xl font-bold font-cairo mb-4 md:mb-8 animate-slide-up drop-shadow-2xl">
                 {bannerData.title[lang]}
               </h2>
-              <div className="flex items-center justify-center gap-3 md:gap-6 animate-slide-up delay-100">
-                <div className="h-[1px] md:h-[2px] w-8 md:w-12 bg-gold hidden md:block"></div>
+              <div className="flex items-center justify-center animate-slide-up delay-100">
                 <p className="text-gold text-sm md:text-2xl font-cairo tracking-[0.2em] md:tracking-[0.3em] uppercase opacity-90">
                   {bannerData.subtitle[lang]}
                 </p>
-                <div className="h-[1px] md:h-[2px] w-8 md:w-12 bg-gold hidden md:block"></div>
               </div>
             </div>
           </section>
@@ -1930,12 +2019,9 @@ export default function App() {
           {/* HERO / ABOUT US SECTION */}
           <section className="bg-white py-12 md:py-24 border-b border-gray-100">
             <div className="max-w-screen-md mx-auto px-6 text-center">
-              <div className="mb-8 flex justify-center">
-                <img src="/images/logo.png" alt="Logo" className="h-24 w-auto" />
-              </div>
-              <h1 className="text-4xl md:text-5xl font-cairo text-navy mb-8 font-bold leading-tight">{texts.storeName}</h1>
+
               <p className="text-lg md:text-xl text-gray-600 font-cairo leading-relaxed mb-10">
-                {texts.aboutStore}
+                {aboutStore[lang]}
               </p>
               <div className="w-16 h-1 bg-gold mx-auto"></div>
             </div>
@@ -2003,6 +2089,7 @@ export default function App() {
           updateCart={updateCart}
           navigateTo={navigateTo}
           setCart={setCart}
+          showOrderPrices={showOrderPrices}
         />
       )}
 
@@ -2011,6 +2098,7 @@ export default function App() {
         <AboutPage
           texts={texts}
           lang={lang}
+          aboutStore={aboutStore}
         />
       )}
 
@@ -2024,10 +2112,14 @@ export default function App() {
           setAppCategories={setAppCategories}
           bannerData={bannerData}
           setBannerData={setBannerData}
+          aboutStore={aboutStore}
+          setAboutStore={setAboutStore}
           footerData={footerData}
           setFooterData={setFooterData}
           showPricesPublicly={showPricesPublicly}
           setShowPricesPublicly={setShowPricesPublicly}
+          showOrderPrices={showOrderPrices}
+          setShowOrderPrices={setShowOrderPrices}
           adminTab={adminTab}
           setAdminTab={setAdminTab}
           navigateTo={navigateTo}
@@ -2123,9 +2215,9 @@ export default function App() {
       )}
 
       {/* HIDDEN CATALOG EXPORT AREA - Styled for PDF */}
-      <div 
-        id="catalog-pdf-export" 
-        className="p-0 bg-white w-[1200px]" 
+      <div
+        id="catalog-pdf-export"
+        className="p-0 bg-white w-[1200px]"
         style={{ direction: 'ltr', position: 'fixed', top: '-9999px', left: '-9999px' }}
       >
         {/* 1. HERO BANNER REPLICA */}
@@ -2173,11 +2265,11 @@ export default function App() {
               return (
                 <div key={cat.id}>
                   {/* CATEGORY RECTANGLE HEADER */}
-                  <div className="relative h-60 rounded-[40px] overflow-hidden mb-16 shadow-2xl">
-                    <img src={cat.image} className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-navy/50 flex items-center justify-center p-8">
-                      <h2 className={`text-5xl font-bold font-cairo text-white uppercase ${lang === 'ar' ? 'text-right' : 'text-center'}`}>{catName}</h2>
+                  <div className="relative h-48 overflow-hidden mb-12 bg-navy flex items-center justify-center rounded-[30px]">
+                    <div className="absolute inset-0 opacity-20">
+                      <img src={cat.image} className="w-full h-full object-cover grayscale" />
                     </div>
+                    <h2 className="relative text-5xl font-bold font-cairo text-white uppercase">{catName}</h2>
                   </div>
 
                   <div className="grid grid-cols-3 gap-8">
@@ -2189,7 +2281,7 @@ export default function App() {
                         <div className="p-6 text-center">
                           <h3 className="text-lg font-bold font-cairo text-navy mb-2 line-clamp-1">{getName(p, lang)}</h3>
                           <div className="w-10 h-0.5 bg-gold mx-auto mb-3"></div>
-                          <p className="text-xl text-gold font-bold font-cairo">{getPrice(p, lang)}</p>
+
                         </div>
                       </div>
                     ))}
