@@ -2014,7 +2014,7 @@ export default function App() {
                 alt="Banner"
               />
             )}
-            <div className="absolute inset-0 bg-black/30"></div>
+            {/* No overlay for maximum brightness */}
 
             <div className="relative z-10 text-center px-6 max-w-5xl">
               <h2 className="text-white text-3xl md:text-8xl font-bold font-cairo mb-4 md:mb-8 animate-slide-up drop-shadow-2xl">
