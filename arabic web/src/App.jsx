@@ -553,22 +553,30 @@ const OrderPage = ({ lang, texts, appCategories, products, cart, updateCart, nav
               </table>
 
               {/* TOTALS SECTION */}
-              {showOrderPrices && (
-                <div className="flex flex-col items-end gap-2 font-cairo">
-                  <div className="flex justify-between w-64 border-b border-gray-100 pb-2">
-                    <span className="text-gray-400 text-sm">{lang === 'ar' ? 'إجمالي المنتجات' : 'Subtotal'}</span>
-                    <span className="font-bold text-navy">
-                      {orderSuccess.items.reduce((sum, item) => sum + (parsePrice(item.price) * item.qty), 0)} ₪
-                    </span>
-                  </div>
-                  <div className="flex justify-between w-64 bg-navy p-4 rounded-xl text-white mt-2">
-                    <span className="font-bold">{lang === 'ar' ? 'المجموع النهائي' : 'Grand Total'}</span>
-                    <span className="text-xl font-bold">
-                      {orderSuccess.items.reduce((sum, item) => sum + (parsePrice(item.price) * item.qty), 0)} ₪
-                    </span>
-                  </div>
+              <div className="flex flex-col items-end gap-2 font-cairo">
+                <div className="flex justify-between w-64 border-b border-gray-100 pb-2">
+                  <span className="text-gray-400 text-sm">{lang === 'ar' ? 'إجمالي الكمية' : 'Total Quantity'}</span>
+                  <span className="font-bold text-navy">
+                    {orderSuccess.items.reduce((sum, item) => sum + item.qty, 0)} {lang === 'ar' ? 'قطع' : 'items'}
+                  </span>
                 </div>
-              )}
+                {showOrderPrices && (
+                  <>
+                    <div className="flex justify-between w-64 border-b border-gray-100 pb-2">
+                      <span className="text-gray-400 text-sm">{lang === 'ar' ? 'إجمالي المنتجات' : 'Subtotal'}</span>
+                      <span className="font-bold text-navy">
+                        {orderSuccess.items.reduce((sum, item) => sum + (parsePrice(item.price) * item.qty), 0)} ₪
+                      </span>
+                    </div>
+                    <div className="flex justify-between w-64 bg-navy p-4 rounded-xl text-white mt-2">
+                      <span className="font-bold">{lang === 'ar' ? 'المجموع النهائي' : 'Grand Total'}</span>
+                      <span className="text-xl font-bold">
+                        {orderSuccess.items.reduce((sum, item) => sum + (parsePrice(item.price) * item.qty), 0)} ₪
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
 
               {/* FOOTER MESSAGE */}
               <div className="mt-16 text-center border-t-2 border-dashed border-gray-100 pt-8">
@@ -1561,6 +1569,10 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
           <div className="flex justify-end mb-10 font-cairo">
             <div className="w-64 bg-gray-50 p-6 rounded-2xl">
               <div className="flex justify-between items-center mb-2">
+                <span className="text-gray-400">{lang === 'ar' ? 'إجمالي الكمية' : 'Total Quantity'}</span>
+                <span className="text-navy font-bold">{exportOrder.items.reduce((sum, item) => sum + item.qty, 0)} {lang === 'ar' ? 'قطع' : 'items'}</span>
+              </div>
+              <div className="flex justify-between items-center mb-2">
                 <span className="text-gray-400">{lang === 'ar' ? 'إجمالي المنتجات' : 'Subtotal'}</span>
                 <span className="text-navy font-bold">{exportOrder.items.reduce((sum, item) => sum + (parsePrice(item.price) * item.qty), 0)} ₪</span>
               </div>
@@ -2281,7 +2293,11 @@ export default function App() {
                         <div className="p-6 text-center">
                           <h3 className="text-lg font-bold font-cairo text-navy mb-2 line-clamp-1">{getName(p, lang)}</h3>
                           <div className="w-10 h-0.5 bg-gold mx-auto mb-3"></div>
-
+                          {showPricesPublicly && (
+                            <div className="text-gold font-bold font-cairo text-base">
+                              {getPrice(p, lang)}
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
