@@ -169,7 +169,7 @@ const getProductFallbackImage = (p) => {
   return '/images/candy (1).jpg'; // default premium fallback
 };
 
-const compressImage = (base64Str, maxWidth = 800, maxHeight = 800, quality = 0.6) => {
+const compressImage = (base64Str, maxWidth = 1920, maxHeight = 1920, quality = 0.85) => {
   return new Promise((resolve) => {
     const img = new Image();
     img.src = base64Str;
@@ -331,7 +331,7 @@ const ProductCard = ({ product, lang, showPricesPublicly, showControls, activePa
   </div>
 );
 
-const CatalogView = ({ lang, texts, searchQuery, setSearchQuery, appCategories, products, showPricesPublicly, activePage, cart, updateCart, setZoomImage, setIsZoomOpen }) => {
+const CatalogView = ({ lang, texts, searchQuery, setSearchQuery, appCategories, products, showPricesPublicly, activePage, cart, updateCart, setZoomImage, setIsZoomOpen, loading }) => {
   // Helper to normalize Arabic characters for better search matching
   const normalizeArabic = (text) => {
     if (!text) return "";
@@ -393,7 +393,12 @@ const CatalogView = ({ lang, texts, searchQuery, setSearchQuery, appCategories, 
       </div>
 
       {/* RESULTS */}
-      {categoriesWithProducts.length > 0 ? (
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-24 gap-4">
+           <div className="w-12 h-12 border-4 border-navy border-t-gold rounded-full animate-spin"></div>
+           <p className="font-cairo text-navy animate-pulse">{lang === 'ar' ? 'جاري التحميل...' : 'Loading products...'}</p>
+        </div>
+      ) : categoriesWithProducts.length > 0 ? (
         categoriesWithProducts.map((category) => (
           <section key={category.id} className="mb-20">
             <div className="mb-12 relative h-48 md:h-80 rounded-2xl overflow-hidden shadow-2xl group cursor-default">
@@ -557,7 +562,7 @@ const OrderPage = ({ lang, texts, appCategories, products, cart, updateCart, nav
                 <div className="flex justify-between w-64 border-b border-gray-100 pb-2">
                   <span className="text-gray-400 text-sm">{lang === 'ar' ? 'إجمالي الكمية' : 'Total Quantity'}</span>
                   <span className="font-bold text-navy">
-                    {orderSuccess.items.reduce((sum, item) => sum + item.qty, 0)} {lang === 'ar' ? 'قطع' : 'items'}
+                    {orderSuccess.items.reduce((sum, item) => sum + item.qty, 0)} {lang === 'ar' ? 'منتج' : 'items'}
                   </span>
                 </div>
                 {showOrderPrices && (
@@ -709,7 +714,7 @@ const OrderPage = ({ lang, texts, appCategories, products, cart, updateCart, nav
                 <div className="flex justify-between items-center mb-2">
                   <span className="font-cairo text-gray-400 text-xs">{lang === 'ar' ? 'عدد الأصناف' : 'Total Items'}</span>
                   <span className="font-cairo text-sm font-bold text-navy">
-                    {Object.values(cart).reduce((a, b) => a + b, 0)} {lang === 'ar' ? 'قطع' : 'items'}
+                    {Object.values(cart).reduce((a, b) => a + b, 0)} {lang === 'ar' ? 'منتج' : 'items'}
                   </span>
                 </div>
                 {showOrderPrices && (
@@ -866,7 +871,14 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
       reader.onloadend = async () => {
         let imageData = reader.result;
         if (file.type.startsWith('image/')) {
-          imageData = await compressImage(reader.result);
+          // Use higher resolution for banner, standard for others
+          const isBanner = type === 'banner';
+          imageData = await compressImage(
+            reader.result, 
+            isBanner ? 3840 : 1500, 
+            isBanner ? 3840 : 1500, 
+            isBanner ? 1.0 : 0.95
+          );
         }
         if (type === 'product') setProductImage(imageData);
         else if (type === 'category') setCategoryImage(imageData);
@@ -1570,7 +1582,7 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
             <div className="w-64 bg-gray-50 p-6 rounded-2xl">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-gray-400">{lang === 'ar' ? 'إجمالي الكمية' : 'Total Quantity'}</span>
-                <span className="text-navy font-bold">{exportOrder.items.reduce((sum, item) => sum + item.qty, 0)} {lang === 'ar' ? 'قطع' : 'items'}</span>
+                <span className="text-navy font-bold">{exportOrder.items.reduce((sum, item) => sum + item.qty, 0)} {lang === 'ar' ? 'منتج' : 'items'}</span>
               </div>
               <div className="flex justify-between items-center mb-2">
                 <span className="text-gray-400">{lang === 'ar' ? 'إجمالي المنتجات' : 'Subtotal'}</span>
@@ -1758,9 +1770,16 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
 export default function App() {
   const [lang, setLang] = useState('ar');
   const [activePage, setActivePage] = useState(() => localStorage.getItem('activePage') || 'home');
-  const [products, setProducts] = useState([]);
-  const [appCategories, setAppCategories] = useState({ ar: [], en: [] });
+  const [products, setProducts] = useState(() => {
+    const cached = localStorage.getItem('cached_products');
+    return cached ? JSON.parse(cached) : [];
+  });
+  const [appCategories, setAppCategories] = useState(() => {
+    const cached = localStorage.getItem('cached_categories');
+    return cached ? JSON.parse(cached) : { ar: [], en: [] };
+  });
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(!localStorage.getItem('cached_products'));
 
   const [showPricesPublicly, setShowPricesPublicly] = useState(false);
   const [showOrderPrices, setShowOrderPrices] = useState(false);
@@ -1774,24 +1793,33 @@ export default function App() {
   const [authError, setAuthError] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const [bannerData, setBannerData] = useState({
-    title: { ar: 'عالم من النكهات', en: 'World of Flavors' },
-    subtitle: { ar: 'حلويات فاخرة مجففة بالتجميد', en: 'Premium Freeze-Dried Sweets' },
-    mediaUrl: 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?auto=format&fit=crop&q=80&w=2000',
-    mediaType: 'image'
+  const [bannerData, setBannerData] = useState(() => {
+    const cached = localStorage.getItem('cached_banner');
+    return cached ? JSON.parse(cached) : {
+      title: { ar: '', en: '' },
+      subtitle: { ar: '', en: '' },
+      mediaUrl: '',
+      mediaType: 'image'
+    };
   });
-  const [aboutStore, setAboutStore] = useState({
-    ar: 'مرحباً بكم في فريز دراي، وجهتكم الأولى لأجود أنواع الحلويات والوجبات الخفيفة المجففة بالتجميد. نحن نفخر بتقديم تجربة طعم فريدة تجمع بين الجودة والابتكار، حيث نستخدم أحدث التقنيات لضمان الحفاظ على النكهة والقيمة الغذائية.',
-    en: 'Welcome to Freeze Dry, your premier destination for the finest freeze-dried sweets and snacks. We pride ourselves on offering a unique taste experience that combines high quality and innovation, using the latest technologies to ensure flavor and nutritional value are preserved.'
+  const [aboutStore, setAboutStore] = useState(() => {
+    const cached = localStorage.getItem('cached_about');
+    return cached ? JSON.parse(cached) : {
+      ar: 'مرحباً بكم في فريز دراي، وجهتكم الأولى لأجود أنواع الحلويات والوجبات الخفيفة المجففة بالتجميد.',
+      en: 'Welcome to Freeze Dry, your premier destination for the finest freeze-dried sweets and snacks.'
+    };
   });
 
-  const [footerData, setFooterData] = useState({
-    phone: '+966 50 000 0000',
-    email: 'info@freezedry.com',
-    addressAr: 'الرياض، المملكة العربية السعودية',
-    addressEn: 'Riyadh, Saudi Arabia',
-    copyrightAr: 'جميع الحقوق محفوظة © {year} فريز دراي.',
-    copyrightEn: 'All rights reserved © {year} Freeze Dry.',
+  const [footerData, setFooterData] = useState(() => {
+    const cached = localStorage.getItem('cached_footer');
+    return cached ? JSON.parse(cached) : {
+      phone: '+966 50 000 0000',
+      email: 'info@freezedry.com',
+      addressAr: 'الرياض، المملكة العربية السعودية',
+      addressEn: 'Riyadh, Saudi Arabia',
+      copyrightAr: 'جميع الحقوق محفوظة © {year} فريز دراي.',
+      copyrightEn: 'All rights reserved © {year} Freeze Dry.',
+    };
   });
 
   const getCategoryFallbackImage = (slug, nameEn) => {
@@ -1813,32 +1841,49 @@ export default function App() {
         const [settingsRes, categoriesRes, productsRes] = await Promise.all([
           fetch('/api/settings').then(res => res.json()),
           fetch('/api/categories').then(res => res.json()),
-          token
-            ? fetch('/api/admin/products', { headers: { 'Authorization': `Bearer ${token}` } }).then(res => res.json())
-            : fetch('/api/products?limit=200').then(res => res.json())
+          (async () => {
+            if (token) {
+              const res = await fetch('/api/admin/products', { headers: { 'Authorization': `Bearer ${token}` } });
+              if (res.status === 401) {
+                localStorage.removeItem('adminToken');
+                setIsAdminAuthenticated(false);
+                return fetch('/api/products?limit=200').then(r => r.json());
+              }
+              return res.json();
+            }
+            return fetch('/api/products?limit=200').then(res => res.json());
+          })()
         ]);
 
         if (settingsRes.success && settingsRes.data) {
           setShowPricesPublicly(settingsRes.data.showPrices);
           setShowOrderPrices(settingsRes.data.showOrderPrices || false);
-          setBannerData({
-            title: { ar: settingsRes.data.bannerTitleAr ?? 'عالم من النكهات', en: settingsRes.data.bannerTitleEn ?? 'World of Flavors' },
+          const newBanner = {
+            title: { ar: settingsRes.data.bannerTitleAr ?? '', en: settingsRes.data.bannerTitleEn ?? '' },
             subtitle: { ar: settingsRes.data.bannerSubtitleAr ?? '', en: settingsRes.data.bannerSubtitleEn ?? '' },
-            mediaUrl: settingsRes.data.bannerMediaUrl || 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?auto=format&fit=crop&q=80&w=2000',
+            mediaUrl: settingsRes.data.bannerMediaUrl || '',
             mediaType: settingsRes.data.bannerMediaType || 'image'
-          });
-          setAboutStore({
-            ar: settingsRes.data.aboutStoreAr ?? 'مرحباً بكم في فريز دراي، وجهتكم الأولى لأجود أنواع الحلويات والوجبات الخفيفة المجففة بالتجميد.',
-            en: settingsRes.data.aboutStoreEn ?? 'Welcome to Freeze Dry, your premier destination for the finest freeze-dried sweets and snacks.'
-          });
-          setFooterData({
+          };
+          setBannerData(newBanner);
+          localStorage.setItem('cached_banner', JSON.stringify(newBanner));
+
+          const newAbout = {
+            ar: settingsRes.data.aboutStoreAr ?? 'مرحباً بكم في فريز دراي...',
+            en: settingsRes.data.aboutStoreEn ?? 'Welcome to Freeze Dry...'
+          };
+          setAboutStore(newAbout);
+          localStorage.setItem('cached_about', JSON.stringify(newAbout));
+
+          const newFooter = {
             phone: settingsRes.data.footerPhone || '+966 50 000 0000',
             email: settingsRes.data.footerEmail || 'info@freezedry.com',
             addressAr: settingsRes.data.footerAddressAr || 'الرياض، المملكة العربية السعودية',
             addressEn: settingsRes.data.footerAddressEn || 'Riyadh, Saudi Arabia',
             copyrightAr: settingsRes.data.footerCopyrightAr || 'جميع الحقوق محفوظة © {year} فريز دراي.',
             copyrightEn: settingsRes.data.footerCopyrightEn || 'All rights reserved © {year} Freeze Dry.',
-          });
+          };
+          setFooterData(newFooter);
+          localStorage.setItem('cached_footer', JSON.stringify(newFooter));
         }
 
         if (categoriesRes.success && categoriesRes.data) {
@@ -1856,10 +1901,12 @@ export default function App() {
             }
             return { id: c._id, name: c.nameEn, image: img };
           });
-          setAppCategories({
+          const newCats = {
             ar: [{ id: 'all', name: 'الكل', image: '/images/yes-and-studio-XVYz_QeiEBw-unsplash.jpg' }, ...catsAr],
             en: [{ id: 'all', name: 'All', image: '/images/yes-and-studio-XVYz_QeiEBw-unsplash.jpg' }, ...catsEn]
-          });
+          };
+          setAppCategories(newCats);
+          localStorage.setItem('cached_categories', JSON.stringify(newCats));
         }
 
         if (productsRes.success && productsRes.data) {
@@ -1874,9 +1921,12 @@ export default function App() {
             visible: p.isVisible
           }));
           setProducts(mappedProducts);
+          localStorage.setItem('cached_products', JSON.stringify(mappedProducts));
         }
       } catch (error) {
         console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
       }
     };
     fetchData();
@@ -1997,35 +2047,44 @@ export default function App() {
       {activePage === 'home' && (
         <div className="animate-fade-in">
           {/* PREMIUM HERO BANNER */}
-          <section className="relative mx-4 mt-6 rounded-3xl md:mx-0 md:mt-0 md:rounded-none overflow-hidden bg-white flex items-center justify-center shadow-x h-[40vh] md:h-[70vh] min-h-[300px] md:min-h-[500px]">
-            {bannerData.mediaType === 'video' ? (
-              <video
-                autoPlay
-                muted
-                loop
-                playsInline
-                className="absolute inset-0 w-full h-full object-cover"
-                src={bannerData.mediaUrl}
-              />
+          <section className="relative mx-0 md:mx-0 mt-0 md:mt-0 overflow-hidden bg-gray-50 flex items-center justify-center shadow-sm w-full h-auto min-h-[200px]">
+            {bannerData.mediaUrl ? (
+              bannerData.mediaType === 'video' ? (
+                <video
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  className="w-full h-auto max-h-[85vh] object-contain"
+                  src={bannerData.mediaUrl}
+                />
+              ) : (
+                <img
+                  src={bannerData.mediaUrl}
+                  className="w-full h-auto max-h-[85vh] object-contain"
+                  style={{ 
+                    imageRendering: 'auto', 
+                    WebkitImageRendering: '-webkit-optimize-contrast',
+                    msInterpolationMode: 'nearest-neighbor' 
+                  }}
+                  alt="Banner"
+                />
+              )
             ) : (
-              <img
-                src={bannerData.mediaUrl}
-                className="absolute inset-0 w-full h-full object-cover"
-                alt="Banner"
-              />
+              <div className="w-full aspect-video bg-gradient-to-br from-navy/5 to-navy/10 animate-pulse" />
             )}
-            {/* No overlay for maximum brightness */}
-
-            <div className="relative z-10 text-center px-6 max-w-5xl">
-              <h2 className="text-white text-3xl md:text-8xl font-bold font-cairo mb-4 md:mb-8 animate-slide-up drop-shadow-2xl">
-                {bannerData.title[lang]}
-              </h2>
-              <div className="flex items-center justify-center animate-slide-up delay-100">
-                <p className="text-gold text-sm md:text-2xl font-cairo tracking-[0.2em] md:tracking-[0.3em] uppercase opacity-90">
+            
+            {/* Overlay texts - only if they are not empty */}
+            {(bannerData.title[lang] || bannerData.subtitle[lang]) && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 pointer-events-none">
+                <h2 className="text-white text-2xl md:text-7xl font-bold font-cairo mb-2 md:mb-6 animate-slide-up drop-shadow-2xl" style={{ WebkitFontSmoothing: 'antialiased' }}>
+                  {bannerData.title[lang]}
+                </h2>
+                <p className="text-gold text-xs md:text-xl font-cairo tracking-widest uppercase opacity-90 drop-shadow-lg" style={{ WebkitFontSmoothing: 'antialiased' }}>
                   {bannerData.subtitle[lang]}
                 </p>
               </div>
-            </div>
+            )}
           </section>
 
           {/* HERO / ABOUT US SECTION */}
@@ -2053,6 +2112,7 @@ export default function App() {
             updateCart={updateCart}
             setZoomImage={setZoomImage}
             setIsZoomOpen={setIsZoomOpen}
+            loading={loading}
           />
 
           {/* FLOATING ORDER BUTTON */}
@@ -2086,6 +2146,7 @@ export default function App() {
             updateCart={updateCart}
             setZoomImage={setZoomImage}
             setIsZoomOpen={setIsZoomOpen}
+            loading={loading}
           />
         </div>
       )}
@@ -2233,9 +2294,11 @@ export default function App() {
         style={{ direction: 'ltr', position: 'fixed', top: '-9999px', left: '-9999px' }}
       >
         {/* 1. HERO BANNER REPLICA */}
-        <div className="relative h-[500px] w-full overflow-hidden mb-12">
-          {bannerData.mediaType === 'image' ? (
+        <div className="relative h-[500px] w-full overflow-hidden mb-12 bg-navy">
+          {bannerData.mediaUrl && bannerData.mediaType === 'image' ? (
             <img src={bannerData.mediaUrl} className="w-full h-full object-cover" />
+          ) : bannerData.mediaUrl && bannerData.mediaType === 'video' ? (
+            <div className="w-full h-full bg-navy flex items-center justify-center text-white text-4xl">FREEZE DRY (Video)</div>
           ) : (
             <div className="w-full h-full bg-navy flex items-center justify-center text-white text-4xl">FREEZE DRY</div>
           )}
