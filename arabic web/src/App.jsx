@@ -237,7 +237,7 @@ const exportElement = async (elementId, filename, format = 'pdf') => {
             t.style.overflow = 'visible';
             t.style.paddingBottom = '5px'; // Small buffer
           });
-          
+
           // Remove any sticky/fixed elements that might block view during capture
           const forbidden = clonedElement.querySelectorAll('header, .sticky, .fixed');
           forbidden.forEach(el => el.style.display = 'none');
@@ -395,8 +395,8 @@ const CatalogView = ({ lang, texts, searchQuery, setSearchQuery, appCategories, 
       {/* RESULTS */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-24 gap-4">
-           <div className="w-12 h-12 border-4 border-navy border-t-gold rounded-full animate-spin"></div>
-           <p className="font-cairo text-navy animate-pulse">{lang === 'ar' ? 'جاري التحميل...' : 'Loading products...'}</p>
+          <div className="w-12 h-12 border-4 border-navy border-t-gold rounded-full animate-spin"></div>
+          <p className="font-cairo text-navy animate-pulse">{lang === 'ar' ? 'جاري التحميل...' : 'Loading products...'}</p>
         </div>
       ) : categoriesWithProducts.length > 0 ? (
         categoriesWithProducts.map((category) => (
@@ -718,15 +718,15 @@ const OrderPage = ({ lang, texts, appCategories, products, cart, updateCart, nav
                   </span>
                 </div>
                 {showOrderPrices && (
-                   <div className="flex justify-between items-center mb-6">
-                     <span className="font-cairo text-gray-400 text-xs">{lang === 'ar' ? 'المجموع الكلي' : 'Grand Total'}</span>
-                     <span className="font-cairo text-xl font-bold text-gold">
-                       {Object.entries(cart).reduce((sum, [id, qty]) => {
-                         const p = products.find(prod => prod.id == id);
-                         return sum + (p ? parsePrice(p.price.en) * qty : 0);
-                       }, 0)} ₪
-                     </span>
-                   </div>
+                  <div className="flex justify-between items-center mb-6">
+                    <span className="font-cairo text-gray-400 text-xs">{lang === 'ar' ? 'المجموع الكلي' : 'Grand Total'}</span>
+                    <span className="font-cairo text-xl font-bold text-gold">
+                      {Object.entries(cart).reduce((sum, [id, qty]) => {
+                        const p = products.find(prod => prod.id == id);
+                        return sum + (p ? parsePrice(p.price.en) * qty : 0);
+                      }, 0)} ₪
+                    </span>
+                  </div>
                 )}
                 <button type="submit" className="w-full py-4 bg-navy text-white font-cairo font-bold uppercase tracking-widest rounded-xl hover:shadow-lg transition-all flex items-center justify-center gap-2 text-sm shadow-xl">
                   <ShoppingBag size={18} />
@@ -874,10 +874,10 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
           // Use higher resolution for banner, standard for others
           const isBanner = type === 'banner';
           imageData = await compressImage(
-            reader.result, 
-            isBanner ? 3840 : 1500, 
-            isBanner ? 3840 : 1500, 
-            isBanner ? 1.0 : 0.95
+            reader.result,
+            isBanner ? 2500 : 1500,
+            isBanner ? 2500 : 1500,
+            isBanner ? 0.9 : 0.85
           );
         }
         if (type === 'product') setProductImage(imageData);
@@ -2062,10 +2062,10 @@ export default function App() {
                 <img
                   src={bannerData.mediaUrl}
                   className="w-full h-auto max-h-[85vh] object-contain"
-                  style={{ 
-                    imageRendering: 'auto', 
+                  style={{
+                    imageRendering: 'auto',
                     WebkitImageRendering: '-webkit-optimize-contrast',
-                    msInterpolationMode: 'nearest-neighbor' 
+                    msInterpolationMode: 'nearest-neighbor'
                   }}
                   alt="Banner"
                 />
@@ -2073,7 +2073,7 @@ export default function App() {
             ) : (
               <div className="w-full aspect-video bg-gradient-to-br from-navy/5 to-navy/10 animate-pulse" />
             )}
-            
+
             {/* Overlay texts - only if they are not empty */}
             {(bannerData.title[lang] || bannerData.subtitle[lang]) && (
               <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 pointer-events-none">
