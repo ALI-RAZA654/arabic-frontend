@@ -3,6 +3,8 @@ import { Search, Menu, X, ShoppingBag, Settings, Plus, Eye, EyeOff, XCircle, Sho
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 
+const API_BASE_URL = 'https://arabicbackend.vercel.app';
+
 const t = {
   ar: {
     storeName: 'فريز دراي',
@@ -656,7 +658,7 @@ const OrderPage = ({ lang, texts, appCategories, products, cart, updateCart, nav
               };
 
               try {
-                const res = await fetch('/api/orders', {
+                const res = await fetch(`${API_BASE_URL}/api/orders`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify(orderPayload)
@@ -823,7 +825,7 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
       if (adminTab === 'orders') {
         try {
           const token = localStorage.getItem('adminToken');
-          const res = await fetch('/api/admin/orders', {
+          const res = await fetch(`${API_BASE_URL}/api/admin/orders`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
           const data = await res.json();
@@ -897,7 +899,7 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
   const deleteOrder = async (id) => {
     try {
       const token = localStorage.getItem('adminToken');
-      const res = await fetch(`/api/admin/orders/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/admin/orders/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -933,7 +935,7 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
     };
 
     try {
-      const url = editingProduct ? `/api/admin/products/${editingProduct.id}` : '/api/admin/products';
+      const url = editingProduct ? `${API_BASE_URL}/api/admin/products/${editingProduct.id}` : `${API_BASE_URL}/api/admin/products`;
       const method = editingProduct ? 'PUT' : 'POST';
       const res = await fetch(url, {
         method,
@@ -967,7 +969,7 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
     };
 
     try {
-      const url = editingCategory ? `/api/admin/categories/${editingCategory.id}` : '/api/admin/categories';
+      const url = editingCategory ? `${API_BASE_URL}/api/admin/categories/${editingCategory.id}` : `${API_BASE_URL}/api/admin/categories`;
       const method = editingCategory ? 'PUT' : 'POST';
       const res = await fetch(url, {
         method,
@@ -1471,7 +1473,7 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
               const fd = new FormData(e.target);
               try {
                 const token = localStorage.getItem('adminToken');
-                const res = await fetch('/api/admin/settings', {
+                const res = await fetch(`${API_BASE_URL}/api/admin/settings`, {
                   method: 'PUT',
                   headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                   body: JSON.stringify({
@@ -1839,19 +1841,19 @@ export default function App() {
         const token = localStorage.getItem('adminToken');
 
         const [settingsRes, categoriesRes, productsRes] = await Promise.all([
-          fetch('/api/settings').then(res => res.json()),
-          fetch('/api/categories').then(res => res.json()),
+          fetch(`${API_BASE_URL}/api/settings`).then(res => res.json()),
+          fetch(`${API_BASE_URL}/api/categories`).then(res => res.json()),
           (async () => {
             if (token) {
-              const res = await fetch('/api/admin/products', { headers: { 'Authorization': `Bearer ${token}` } });
+              const res = await fetch(`${API_BASE_URL}/api/admin/products`, { headers: { 'Authorization': `Bearer ${token}` } });
               if (res.status === 401) {
                 localStorage.removeItem('adminToken');
                 setIsAdminAuthenticated(false);
-                return fetch('/api/products?limit=200').then(r => r.json());
+                return fetch(`${API_BASE_URL}/api/products?limit=200`).then(r => r.json());
               }
               return res.json();
             }
-            return fetch('/api/products?limit=200').then(res => res.json());
+            return fetch(`${API_BASE_URL}/api/products?limit=200`).then(res => res.json());
           })()
         ]);
 
@@ -2222,7 +2224,7 @@ export default function App() {
             <form onSubmit={async (e) => {
               e.preventDefault();
               try {
-                const res = await fetch('/api/admin/login', {
+                const res = await fetch(`${API_BASE_URL}/api/admin/login`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
