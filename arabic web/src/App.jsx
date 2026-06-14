@@ -1413,7 +1413,7 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
 
                 try {
                   const token = localStorage.getItem('adminToken');
-                  const res = await fetch('/api/admin/change-password', {
+                  const res = await fetch(`${API_BASE_URL}/api/admin/change-password`, {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',
