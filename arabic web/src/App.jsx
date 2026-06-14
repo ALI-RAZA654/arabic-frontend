@@ -1378,7 +1378,7 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
                       showPrices: showPricesPublicly,
                       showOrderPrices: !showOrderPrices
                     };
-                    const res = await fetch('/api/admin/settings', {
+                    const res = await fetch(`${API_BASE_URL}/api/admin/settings`, {
                       method: 'PUT',
                       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                       body: JSON.stringify(payload)
