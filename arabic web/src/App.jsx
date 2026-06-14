@@ -1073,7 +1073,7 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
                         if (confirm('Are you sure?')) {
                           try {
                             const token = localStorage.getItem('adminToken');
-                            const res = await fetch(`/api/admin/products/${p.id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+                            const res = await fetch(`${API_BASE_URL}/api/admin/products/${p.id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
                             if (res.ok) window.location.reload();
                           } catch (e) { console.error(e); }
                         }
@@ -1083,7 +1083,7 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
                       onClick={async () => {
                         try {
                           const token = localStorage.getItem('adminToken');
-                          const res = await fetch(`/api/admin/products/${p.id}`, {
+                          const res = await fetch(`${API_BASE_URL}/api/admin/products/${p.id}`, {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                             body: JSON.stringify({ isVisible: !p.visible })
@@ -1123,7 +1123,7 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
                         if (confirm('Are you sure?')) {
                           try {
                             const token = localStorage.getItem('adminToken');
-                            const res = await fetch(`/api/admin/categories/${cat.id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+                            const res = await fetch(`${API_BASE_URL}/api/admin/categories/${cat.id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
                             if (res.ok) window.location.reload();
                             else {
                               const data = await res.json();
@@ -1239,7 +1239,7 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
 
               try {
                 const token = localStorage.getItem('adminToken');
-                const res = await fetch('/api/admin/settings', {
+                const res = await fetch(`${API_BASE_URL}/api/admin/settings`, {
                   method: 'PUT',
                   headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                   body: JSON.stringify(payload)
@@ -1342,7 +1342,7 @@ const AdminView = ({ lang, products, setProducts, appCategories, setAppCategorie
                       bannerMediaUrl: bannerData.mediaUrl,
                       showPrices: !showPricesPublicly
                     };
-                    const res = await fetch('/api/admin/settings', {
+                    const res = await fetch(`${API_BASE_URL}/api/admin/settings`, {
                       method: 'PUT',
                       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                       body: JSON.stringify(payload)
